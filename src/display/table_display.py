@@ -1,0 +1,244 @@
+"""Rich table display for ticket visualization."""
+from typing import Optional
+import asyncpg
+from rich.console import Console
+from rich.table import Table
+from rich.panel import Panel
+from rich.text import Text
+
+
+def get_priority_color(priority: str) -> str:
+    """
+    Return Rich color string for priority level.
+
+    Args:
+        priority: Priority level (low, medium, high, critical)
+
+    Returns:
+        Rich color name
+    """
+    color_map = {
+        "critical": "bright_red",
+        "high": "red",
+        "medium": "yellow",
+        "low": "green"
+    }
+    return color_map.get(priority.lower(), "white")
+
+
+def get_category_color(category: str) -> str:
+    """
+    Return Rich color string for category.
+
+    Args:
+        category: Category type (billing, technical, feature_request, general)
+
+    Returns:
+        Rich color name
+    """
+    color_map = {
+        "billing": "cyan",
+        "technical": "magenta",
+        "feature_request": "blue",
+        "general": "white"
+    }
+    return color_map.get(category.lower(), "white")
+
+
+def get_sentiment_color(score: float) -> str:
+    """
+    Return Rich color string for sentiment score.
+
+    Args:
+        score: Sentiment score (0.0-1.0)
+
+    Returns:
+        Rich color name
+    """
+    if score < 0.4:
+        return "red"
+    elif score < 0.6:
+        return "yellow"
+    else:
+        return "green"
+
+
+def get_sentiment_emoji(score: float) -> str:
+    """
+    Return emoji indicator for sentiment score.
+
+    Args:
+        score: Sentiment score (0.0-1.0)
+
+    Returns:
+        Emoji string
+    """
+    if score < 0.4:
+        return "😞"
+    elif score < 0.6:
+        return "😐"
+    else:
+        return "😊"
+
+
+def format_sentiment(score: float) -> str:
+    """
+    Format sentiment as percentage with emoji.
+
+    Args:
+        score: Sentiment score (0.0-1.0)
+
+    Returns:
+        Formatted string like "85% 😊"
+    """
+    percentage = int(score * 100)
+    emoji = get_sentiment_emoji(score)
+    return f"{percentage}% {emoji}"
+
+
+def truncate_text(text: str, max_length: int) -> str:
+    """
+    Truncate text to max_length with ellipsis.
+
+    Args:
+        text: Text to truncate
+        max_length: Maximum length before truncation
+
+    Returns:
+        Truncated text with "..." if needed
+    """
+    if len(text) <= max_length:
+        return text
+    return text[:max_length - 3] + "..."
+
+
+async def fetch_recent_tickets(pool: asyncpg.Pool, limit: int = 5) -> list[dict]:
+    """
+    Fetch most recent tickets with customer information.
+
+    Args:
+        pool: Database connection pool
+        limit: Number of tickets to fetch (default 5)
+
+    Returns:
+        List of ticket dictionaries with customer data
+    """
+    query = """
+        SELECT
+            t.id,
+            t.summary,
+            t.category,
+            t.priority,
+            t.sentiment_score,
+            t.created_at,
+            c.name as customer_name,
+            c.email as customer_email
+        FROM tickets t
+        JOIN customers c ON t.customer_id = c.id
+        ORDER BY t.created_at DESC
+        LIMIT $1
+    """
+
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(query, limit)
+
+    # Convert asyncpg Records to dictionaries
+    return [dict(row) for row in rows]
+
+
+async def display_recent_tickets(
+    pool: asyncpg.Pool,
+    limit: int = 5,
+    highlight_id: Optional[int] = None
+) -> None:
+    """
+    Display recent tickets in a Rich table.
+
+    Args:
+        pool: Database connection pool
+        limit: Number of recent tickets to display
+        highlight_id: Optional ticket ID to highlight (newly processed)
+    """
+    console = Console(force_terminal=True)
+
+    try:
+        # Fetch tickets
+        tickets = await fetch_recent_tickets(pool, limit)
+
+        # Handle empty database
+        if not tickets:
+            panel = Panel(
+                "[yellow]No tickets found. Process your first ticket![/yellow]",
+                title="Recent Tickets",
+                border_style="yellow"
+            )
+            console.print(panel)
+            return
+
+        # Create table
+        table = Table(
+            title=f"[bold cyan]Recent Tickets (Last {len(tickets)})[/bold cyan]",
+            title_justify="left",
+            border_style="bright_black",
+            show_header=True,
+            header_style="bold cyan",
+            show_lines=True,
+            padding=(0, 1)
+        )
+
+        # Add columns with flexible widths (no fixed width for better terminal compatibility)
+        table.add_column("ID", justify="right", style="dim", no_wrap=True)
+        table.add_column("Customer", justify="left", no_wrap=True)
+        table.add_column("Summary", justify="left", max_width=45)
+        table.add_column("Category", justify="center", no_wrap=True)
+        table.add_column("Priority", justify="center", no_wrap=True)
+        table.add_column("Sentiment", justify="center", no_wrap=True)
+
+        # Add rows
+        for ticket in tickets:
+            # Determine if this row should be highlighted
+            is_new = highlight_id and ticket['id'] == highlight_id
+            row_style = "on dark_green" if is_new else None
+
+            # Format data
+            ticket_id = str(ticket['id'])
+            customer = truncate_text(ticket['customer_name'], 15)
+            summary = truncate_text(ticket['summary'], 45)
+
+            # Category with color
+            category = ticket['category']
+            category_color = get_category_color(category)
+            category_text = Text(category.replace('_', ' ').title(), style=category_color)
+
+            # Priority with color and bold for critical
+            priority = ticket['priority']
+            priority_color = get_priority_color(priority)
+            priority_style = f"{priority_color} bold" if priority.lower() == "critical" else priority_color
+            priority_text = Text(priority.upper(), style=priority_style)
+
+            # Sentiment with color and emoji
+            sentiment_score = ticket['sentiment_score']
+            sentiment_str = format_sentiment(sentiment_score)
+            sentiment_color = get_sentiment_color(sentiment_score)
+            sentiment_text = Text(sentiment_str, style=sentiment_color)
+
+            # Add row
+            table.add_row(
+                ticket_id,
+                customer,
+                summary,
+                category_text,
+                priority_text,
+                sentiment_text,
+                style=row_style
+            )
+
+        # Print table
+        console.print()
+        console.print(table)
+        console.print()
+
+    except Exception as e:
+        # Fallback to error message
+        console.print(f"[red]Error displaying tickets: {e}[/red]")
+        raise
