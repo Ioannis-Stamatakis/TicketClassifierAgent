@@ -84,21 +84,27 @@ Customer Ticket → PydanticAI Agent → Google Gemini AI → Structured Output 
 
 ### Process Tickets
 
-The application supports three modes for ticket input:
+The application supports multiple modes for ticket input:
 
-**1. Default Sample Ticket**
+**1. Random Sample Ticket (Default)**
 ```bash
 python -m src.main
 ```
-Processes a built-in sample ticket for testing.
+Processes one random ticket from 5 built-in sample tickets covering different scenarios (billing issues, technical problems, feature requests, pricing questions, and positive feedback).
 
-**2. Command-Line Input**
+**2. Process All Sample Tickets**
+```bash
+python -m src.main --all
+```
+Processes all 5 built-in sample tickets sequentially, demonstrating the full range of ticket types and AI classification capabilities.
+
+**3. Command-Line Input**
 ```bash
 python -m src.main "Subject: Need help with my account. Email: user@example.com Name: John Doe"
 ```
 Provide the entire ticket content as a command-line argument.
 
-**3. Interactive Mode**
+**4. Interactive Mode**
 ```bash
 python -m src.main --interactive
 ```
@@ -129,6 +135,27 @@ Recent Tickets (Last 5)
 ```
 
 The table automatically updates after each ticket is processed, providing instant visual feedback on classification results.
+
+### Built-in Sample Tickets
+
+The system includes 5 diverse sample tickets for testing:
+
+1. **Billing Error** - Critical priority, negative sentiment (Sarah Johnson)
+   - Double-charged subscription with immediate refund demand
+
+2. **Login Issues** - High priority, negative sentiment (Michael Chen)
+   - Unable to access account with password reset problems
+
+3. **Feature Request** - Medium priority, positive sentiment (Emma Davis)
+   - Dark mode request for late-night usage
+
+4. **Pricing Questions** - Low priority, positive sentiment (Alex Rivera)
+   - Inquiry about plan upgrades and pricing details
+
+5. **Thank You Note** - Low priority, very positive sentiment (Olivia Martinez)
+   - Appreciation for excellent customer service
+
+These samples demonstrate the AI's ability to correctly classify various ticket types, assign appropriate priorities, and detect sentiment accurately.
 
 ### Add Test Tickets
 

@@ -189,7 +189,7 @@ async def display_recent_tickets(
         # Add columns with flexible widths (no fixed width for better terminal compatibility)
         table.add_column("ID", justify="right", style="dim", no_wrap=True)
         table.add_column("Customer", justify="left", no_wrap=True)
-        table.add_column("Summary", justify="left", max_width=45)
+        table.add_column("Summary", justify="left", max_width=60, overflow="fold")
         table.add_column("Category", justify="center", no_wrap=True)
         table.add_column("Priority", justify="center", no_wrap=True)
         table.add_column("Sentiment", justify="center", no_wrap=True)
@@ -203,7 +203,7 @@ async def display_recent_tickets(
             # Format data
             ticket_id = str(ticket['id'])
             customer = truncate_text(ticket['customer_name'], 15)
-            summary = truncate_text(ticket['summary'], 45)
+            summary = ticket['summary']  # No truncation - let Rich handle wrapping
 
             # Category with color
             category = ticket['category']
