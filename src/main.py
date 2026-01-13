@@ -5,6 +5,7 @@ import sys
 from src.config.settings import Settings
 from src.database.connection import create_pool, init_database, close_pool
 from src.agent.ticket_agent import create_ticket_agent
+from src.display.table_display import display_recent_tickets
 
 
 # Sample customer ticket for testing
@@ -154,17 +155,8 @@ async def main():
             deps=pool
         )
 
-        # 6. Display results
-        print("\n[6/6] Analysis Results:")
-        print("=" * 60)
-        print(f"  Summary: {result.output.summary}")
-        print(f"  Category: {result.output.category}")
-        print(f"  Priority: {result.output.priority}")
-        print(f"  Sentiment Score: {result.output.sentiment_score:.2f}")
-        print("=" * 60)
-
-        # Save to database manually
-        print("\n  Saving to database...")
+        # 6. Save to database manually
+        print("\n[6/6] Saving to database...")
         async with pool.acquire() as conn:
             async with conn.transaction():
                 # UPSERT customer
@@ -193,6 +185,14 @@ async def main():
                 )
 
         print(f"  ✓ Saved as Ticket #{ticket_id} for Customer #{customer_id}")
+
+        # Display results in Rich table
+        print("\n[7/7] Displaying Recent Tickets:")
+        await display_recent_tickets(
+            pool=pool,
+            limit=5,
+            highlight_id=ticket_id
+        )
 
         print("\n✓ Processing complete!")
 
